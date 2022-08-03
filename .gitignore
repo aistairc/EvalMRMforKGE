@@ -140,3 +140,4 @@ venv.bak/
 visualization/*
 
 .DS_Store
+*.ipynb

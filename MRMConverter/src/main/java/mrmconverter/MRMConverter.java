@@ -37,17 +37,6 @@ import org.apache.jena.update.UpdateRequest;
 public class MRMConverter {
 	final static String kgc = "http://kgc.knowledge-graph.jp/ontology/kgc.owl#";
 	static Map<String, Metadata> id_map = new HashMap<String,Metadata>();
-	static String[] bugs = {
-//			"http://kgc.knowledge-graph.jp/data/ACaseOfIdentity/489",
-//			"http://kgc.knowledge-graph.jp/data/ACaseOfIdentity/546",
-//			"http://kgc.knowledge-graph.jp/data/ACaseOfIdentity/312",
-//			"http://kgc.knowledge-graph.jp/data/ACaseOfIdentity/161",
-//			"http://kgc.knowledge-graph.jp/data/ACaseOfIdentity/526",
-//			"http://kgc.knowledge-graph.jp/data/SilverBlaze/381",
-//			"http://kgc.knowledge-graph.jp/data/SilverBlaze/380",
-//			"http://kgc.knowledge-graph.jp/data/ACaseOfIdentity/437",
-//			"http://kgc.knowledge-graph.jp/data/ACaseOfIdentity/502"
-			};
 	
 	public static Model rdfLoader(String file_path) {
 		Model model = ModelFactory.createDefaultModel();
@@ -156,89 +145,19 @@ public class MRMConverter {
 		return stmt_map;
 	}
 	
-	public static RDFNode getRDFStarStatement(String scene, Model model) {
-		String sparql = "PREFIX kgc: <http://kgc.knowledge-graph.jp/ontology/kgc.owl#>\n"
-				+ "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n"
-				+ "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n"
-				+ "SELECT DISTINCT * WHERE {\n"
-				+ "?s rdf:value \"" + scene + "\" .\n"
-				+ "}";
-		Query query = QueryFactory.create(sparql);
-		QueryExecution qe = QueryExecutionFactory.create(query, model);
-		ResultSet results = qe.execSelect();
-		RDFNode s = null;
-		while (results.hasNext()) {
-			QuerySolution result = results.next();
-			s = result.get("s");
-		}
-		return s;
-	}
 	
-	public static ArrayList<Resource> expandNestStatement(Map<String,ArrayList<Metadata>> stmt_map, String obj, Model model, String mode) {
-		ArrayList<Resource> obj_r_list = new ArrayList<Resource>();
-		Resource obj_r = null;
-		
-		String[] uri_split = obj.split("/");
-		String id = uri_split[uri_split.length-1];
-		Pattern pattern = Pattern.compile("^[0-9]{3}$");
-		Matcher matcher = pattern.matcher(id);
-		
-		// if obj is scene resource
-		if (matcher.find() && !Arrays.asList(bugs).contains(obj)) {
-//			System.out.println(obj);
-			ArrayList<Metadata> _stmt_list = stmt_map.get(obj);
-			try {
-				for (Metadata _stmt : _stmt_list) {
-					String _subj = _stmt.getSubj();
-					String _pred = _stmt.getPred();
-					String _obj = _stmt.getObj();
-					String scene = _stmt.getScene();
-					Resource _subj_r = model.getResource(_subj);
-					Property _pred_r = model.getProperty(_pred);
-					ArrayList<Resource> _obj_r_list = expandNestStatement(stmt_map, _obj, model, mode);
-					for (Resource _obj_r : _obj_r_list) {
-						obj_r = createRDFStarStatement(_subj_r, _pred_r, _obj_r, scene, model, mode); 
-						obj_r_list.add(obj_r);
-					}
-				}
-			} catch (Exception e) {
-				// issues on the kg side
-//				e.printStackTrace();
-				obj_r = model.getResource(obj);
-				obj_r_list.add(obj_r);
-			}
-		} else {
-			obj_r = model.getResource(obj);
-			obj_r_list.add(obj_r);
-		}
-		return obj_r_list;
-	}
-	
-	public static Resource createRDFStarStatement(Resource subj_r, Property pred_r, Resource obj_r, String scene, Model model, String mode) {
-		Statement _rdf_stmt = model.createStatement(subj_r, pred_r, obj_r);
-		Resource _rdf_stmt_r = model.createResource(_rdf_stmt);
-		Statement rdf_stmt = null;
-		Resource rdf_stmt_r = null;
-
-		// Not distinguish quoted triples
-		if (mode.equals("0")) {
-			rdf_stmt_r = _rdf_stmt_r;
-			rdf_stmt_r.addProperty(RDF.value, model.createLiteral(scene));
-		} 
-		// Distinguish quoted triples by id
-		else {
-			rdf_stmt = model.createStatement(_rdf_stmt_r, RDF.value, scene);
-			rdf_stmt_r = model.createResource(rdf_stmt);
-		}
-		
-		model.removeAll(model.getResource(scene), null, null);
-		
-		return rdf_stmt_r;
-	}
 	
 	public static void main(String[] args) {
 		String file_path = args[0];
-		String mode = args[1];
+		String target_type = args[1];
+		String mode = null;
+		String rdf_star_type = "";
+		if (args.length > 2) {
+			mode = args[2];
+			if(!mode.equals("0")) {
+				rdf_star_type = "_ext"; 
+			}
+		}
 //		String source_type = args[1]; // source MRM
 //		String target_type = args[2]; // target MRM
 		try {
@@ -295,43 +214,13 @@ public class MRMConverter {
 			
 			Map<String, ArrayList<Metadata>> stmt_map = executeQuery(sparql, model);
 			
-			for (Entry<String, ArrayList<Metadata>> e : stmt_map.entrySet()) {
-				
-				String scene = e.getKey();
-				ArrayList<Metadata> stmt_list = e.getValue();
-				
-				for (Metadata stmt : stmt_list) {
-					String subj = stmt.getSubj();
-					String pred = stmt.getPred();
-					String obj = stmt.getObj();
-					Map<String,String> metadata = stmt.getMetadata();
-					
-					if (model.contains(null, RDF.value, scene)) {
-						//The statement resource has been already created.
-						continue;
-					}
-					
-					Resource subj_r = model.getResource(subj);
-					Property pred_r = model.getProperty(pred);
-					ArrayList<Resource> obj_r_list = expandNestStatement(stmt_map, obj, model, mode);
-					
-					// There can be more than one object.
-					for (Resource obj_r : obj_r_list) {
-						Resource rdf_stmt_r = createRDFStarStatement(subj_r, pred_r, obj_r, scene, model, mode);
-
-						// Metadata of RDFStar statement resource
-						for (Entry<String,String> e2 : metadata.entrySet()) {
-							String key = e2.getKey();
-							Property key_p = model.getProperty(kgc + key);
-							String val = e2.getValue();
-							ArrayList<Resource> val_r_list = expandNestStatement(stmt_map, val, model, mode);
-							for (Resource val_r : val_r_list) {
-								rdf_stmt_r.addProperty(key_p, val_r);
-							}
-						}
-					}
-				}
-				
+			if (target_type.equals("rdr")) {
+				model = RDR.create(model, stmt_map, mode);
+			} else if (target_type.equals("sgprop")) {
+				model = SingletonProperty.create(model, stmt_map);
+			} else {
+				System.out.println("Invalid target type. Please enter the valid target type (rdr or sgprop).");
+				System.exit(0);
 			}
 			
 			model.setNsPrefix("owl", OWL.NS);
@@ -347,12 +236,15 @@ public class MRMConverter {
 			model.setNsPrefix("kddm", "http://kgc.knowledge-graph.jp/data/DancingMen/");
 			model.setNsPrefix("kdsb", "http://kgc.knowledge-graph.jp/data/SpeckledBand/");
 			
-			String rdf_star_type = "";
-			if(!mode.equals("0")) {
-				rdf_star_type = "_ext"; 
+			FileOutputStream fout;
+			if (target_type.equals("rdr")) {
+				fout = new FileOutputStream("rdf-star" + rdf_star_type + "_0726.ttl");
+				model.write(fout, "TTL");
+			} else if (target_type.equals("sgprop")) {
+				fout = new FileOutputStream("sgprop.ttl");
+				model.write(fout, "TTL");
 			}
-			FileOutputStream fout = new FileOutputStream("rdf-star" + rdf_star_type + ".ttl");
-			model.write(fout, "TTL");
+			
 			System.out.println("finished");
 		} catch (Exception e) {
 			e.printStackTrace();
