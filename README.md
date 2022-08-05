@@ -43,17 +43,21 @@ Please see [Report on the First Knowledge Graph Reasoning Challenge 2018](https:
 Convert KGRC-RDF (Event-centric model) to RDF-star
 ```bash
 cd MRMConverter
-java -jar MRMConverter.jar kgrc_all.nt 0
+java -jar MRMConverter.jar kgrc_all.nt rdr 0
 ```
 rdf-star.ttl is generated.
 
 Convert KGRC-RDF (Event-centric model) to RDF-star+ID  
 RDF-star+ID distinguishes same quoted triples that occur in different contexts.
 ```bash
-java -jar MRMConverter.jar kgrc_all.nt 1
+java -jar MRMConverter.jar kgrc_all.nt rdr 1
 ```
 rdf-star\_ext.ttl is generated.  
 
+Convert KGRC-RDF (Event-centric model) to Singleton Property  
+```bash
+java -jar MRMConverter.jar kgrc_all.nt sgprop
+```
 2. Load ttl files into a triplestore.  
 
 3. Get tsv files using the below SPARQL queries.
