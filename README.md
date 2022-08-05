@@ -62,7 +62,7 @@ java -jar MRMConverter.jar kgrc_all.nt sgprop
 
 3. Get tsv files using the below SPARQL queries.
 
-For Event-centric model:
+For Event-centric model and Singleton Property:
 ```sql
 PREFIX kgc: <http://kgc.knowledge-graph.jp/ontology/kgc.owl#>
 SELECT DISTINCT ?s ?p ?o
